@@ -4,13 +4,7 @@ import java.security.MessageDigest
 
 class Fetcher {
 
-    static String digest(URL url) {
-        def inputStream = url.openStream()
-
-        MessageDigest.getInstance("SHA-256").digest(inputStream.bytes).encodeHex().toString()
-    }
-
-    public static void main(String... args) {
+    void fetch() {
 
         JsonSlurper slurper = new JsonSlurper()
         def releases = slurper.parse(new URL("https://api.github.com/repos/docker/compose/releases")) as List
@@ -46,5 +40,11 @@ class Fetcher {
             [(version): "sha256:$sha"]
         }
         hashes
+    }
+
+    private static String digest(URL url) {
+        def inputStream = url.openStream()
+
+        MessageDigest.getInstance("SHA-256").digest(inputStream.bytes).encodeHex().toString()
     }
 }
