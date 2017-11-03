@@ -1,27 +1,34 @@
 import groovy.json.JsonSlurper
+import groovy.util.logging.Log
 
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.security.MessageDigest
 
 class Fetcher {
 
-    void fetch() {
+
+    void fetch(String path) {
+        StringBuffer stringBuffer = new StringBuffer()
 
         JsonSlurper slurper = new JsonSlurper()
         def releases = slurper.parse(new URL("https://api.github.com/repos/docker/compose/releases")) as List
         def latest = releases[0].name
 
-        println("docker_compose_latest: $latest")
-        println("docker_compose_checksums:")
+        stringBuffer.append("docker_compose_latest: $latest\n")
+        stringBuffer.append("docker_compose_checksums:\n")
         for (String os in ['Linux', 'Darwin', 'Windows']) {
 
             Object hashes = getHashes(releases, os)
 
-            println("  \"$os\":")
-            println("    \"latest\": \"sha256:${hashes[latest]}\"")
+            stringBuffer.append("  \"$os\":\n")
+            stringBuffer.append("    \"latest\": \"sha256:${hashes[latest]}\"\n")
             hashes.each { version, sha ->
-                println("    \"$version\": \"$sha\"")
+                stringBuffer.append("    \"$version\": \"sha256:$sha\"\n")
             }
         }
+
+        Paths.get(path).setText(stringBuffer.toString())
     }
 
     private static Object getHashes(List releases, String os) {
@@ -35,9 +42,8 @@ class Fetcher {
 
 
         def hashes = downloads.collectEntries { version, String url ->
-            // println("calculate sha256 of: $url")
             def sha = digest(new URL(url))
-            [(version): "sha256:$sha"]
+            [(version): "$sha"]
         }
         hashes
     }

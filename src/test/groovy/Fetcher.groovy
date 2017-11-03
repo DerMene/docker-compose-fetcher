@@ -7,9 +7,9 @@ class FetcherSpec extends Specification {
         def fetcher = new Fetcher()
 
         when:
-        fetcher.fetch()
+        fetcher.fetch(System.getProperty("user.home") + "/ansible-role/vars/main.yml")
 
-        expect:
+        then:
         noExceptionThrown()
     }
 }

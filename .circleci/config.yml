@@ -38,5 +38,20 @@ jobs:
             - ~/.m2
           key: v1-dependencies-{{ checksum "build.gradle" }}
 
-      # run tests!
+      # add key from SSH Permissions
+      - add_ssh_keys:
+          fingerprints:
+            - "cc:bc:63:58:1f:de:7c:d1:45:f6:c7:5b:9a:f2:37:82"
+
+      - run: git config --global user.email "arndt@menedev.de" > /dev/null 2>&1
+      - run: git config --global user.name "Michael Arndt" > /dev/null 2>&1
+      - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ~/ansible-role
+
+      # generate
       - run: gradle test
+
+      - run: cd ~/ansible-role && git add vars/main.yml
+      - run: cd ~/ansible-role && git diff-index --quiet HEAD || git commit -m "updated vars/main.yml"
+
+      # specify other key (name corresponds to fingerprint)
+      - run: cd ~/ansible-role && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_rsa_ccbc63581fde7cd145f6c75b9af23782' git push origin master
