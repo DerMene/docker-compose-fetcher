@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import requests
 import json
 import hashlib
@@ -53,13 +55,16 @@ def asset_to_checksum(asset, release):
 
 def skip_asset(asset, release):
     name = asset['name']
+    if unicode.endswith(name, '.sha256') and asset['size'] == 65:
+        return True
+
     content_type = asset[u'content_type']
     if not (content_type == u'application/octet-stream' and 'Linux' in name
             or content_type == u'application/octet-stream' and 'Darwin' in name
             or content_type in [u'application/x-msdownload', u'application/x-ms-dos-executable'] and 'Windows' in name):
         return True
-    else:
-        return False
+
+    return False
 
 def get_github_versions(organization, project, known_releases):
     url_pattern = "https://api.github.com/repos/{organization}/{project}/releases"
@@ -76,20 +81,30 @@ def get_github_versions(organization, project, known_releases):
 
     releases = {}
 
+    key_checksum = quote('checksum')
+    key_url = quote('url')
+    key_version = quote('version')
     for release in response_body:
         for asset in release['assets']:
             os = asset_to_os(asset, release)
             if skip_asset(asset, release):
                 continue
-            os_releases = releases.get(os, {})
+            os_releases = releases.get(os, OrderedDict())
             version = asset_to_version(asset, release)
-            version_hash = os_releases.get(version, known_releases.get(os, {}).get(version, None))
-            if not version_hash:
-                print "no hash for %s %s, downloading" % (os, version)
-                version_hash = asset_to_checksum(asset, release)
+            version_entry = known_releases.get(os, {}).get(version, None)
+            if not version_entry:
+                print "no checksum for %s %s, downloading" % (os, version)
+                version_checksum = asset_to_checksum(asset, release)
+            else:
+                version_checksum = version_entry[key_checksum]
 
-            os_releases[version] = version_hash
-            releases[os] = os_releases
+            os_releases[quote(version)] = {
+                key_checksum: quote(version_checksum),
+                key_url: quote(asset['browser_download_url']),
+                key_version: quote(version)
+            }
+
+            releases[quote(os)] = os_releases
             print "found %s %s" % (os, version)
     return releases
 
@@ -114,7 +129,8 @@ if __name__ == '__main__':
         except yaml.YAMLError as exc:
             print(exc)
 
-    known_releases = vars_main.get("docker_compose_checksums", {})
+    known_releases = vars_main.get("docker_compose", {})
+    vars_main["docker_compose"] = known_releases
 
     with open("menedev.docker-compose/.travis.yml", 'r') as stream:
         try:
@@ -125,12 +141,12 @@ if __name__ == '__main__':
     github = get_github_versions('docker', 'compose', known_releases)
     ansible = get_pip_versions('ansible')
 
-    # add github releases one by one to preserve comments in yaml
-    for os, os_version in github.items():
-        for version, digest in os_version.items():
-            old = known_releases[os].get(version, None)
-            if old is None or old != digest:
-                known_releases[os][quote(version)] = quote(digest)
+    # # add github releases one by one to preserve comments in yaml
+    # for os, os_version in github.items():
+    #     for version, digest in os_version.items():
+    #         old = known_releases[os].get(version, None)
+    #         if old is None or old != digest:
+    #             known_releases[os][quote(version)] = quote(digest)
 
     # delete entries from known values that are not in github releases
     for os, os_version in known_releases.items():
@@ -139,35 +155,27 @@ if __name__ == '__main__':
             if other is None:
                 del known_releases[os][version]
 
-    key_latest = quote('latest')
-    key_latest_stable = quote('latest_stable')
-
-    # for each os, look for the latest version
-    for os, os_version in known_releases.items():
-        latest = max(os_version.keys(), key=lambda v: parse(v))
-        os_version[key_latest] = os_version[latest]
-
-        latest_stable = max([v for v in os_version.keys() if not parse(v).is_prerelease], key=lambda v: parse(v))
-        os_version[key_latest_stable] = os_version[latest_stable]
-
+    key_latest = quote('edge')
+    key_latest_stable = quote('latest')
 
     # order the lists of releases
     #  1. latest
     #  2. latest_stable
     #  ... desc versions
-    for os, os_version in known_releases.items():
-        latest = os_version[key_latest]
-        latest_stable = os_version[key_latest_stable]
-        del os_version[key_latest]
-        del os_version[key_latest_stable]
-        version_hash_list = os_version.items()
-        version_hash_list = sorted(version_hash_list, key=lambda version_hash: parse(version_hash[0]), reverse=True)
+    for os, os_version in github.items():
+        version_keys = os_version.keys()
+        latest = max(version_keys, key=lambda v: parse(v))
+        latest = dict(os_version[latest])
+        latest_stable = max([v for v in version_keys if not parse(v).is_prerelease], key=lambda v: parse(v))
+        latest_stable = dict(os_version[latest_stable])
+        version_checksum_list = os_version.items()
+        version_checksum_list = sorted(version_checksum_list, key=lambda version_checksum: parse(version_checksum[0]), reverse=True)
+        os_version = known_releases[os]
         del os_version[:]
         os_version[key_latest] = latest
         os_version[key_latest_stable] = latest_stable
-        for version, digest in version_hash_list:
+        for version, digest in version_checksum_list:
             os_version[version] = digest
-
 
     with open(out_vars_main, 'w') as saveTo:
         yaml.dump(vars_main, saveTo)
