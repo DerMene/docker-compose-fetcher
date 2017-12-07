@@ -2,7 +2,8 @@ import requests
 import json
 import hashlib
 
-import ruamel.yaml as yaml
+from ruamel.yaml import YAML
+from ruamel.yaml.scalarstring import SingleQuotedScalarString, DoubleQuotedScalarString
 
 try:
     from packaging.version import parse
@@ -93,7 +94,15 @@ def get_github_versions(organization, project, known_releases):
     return releases
 
 
+def quote(string):
+    return DoubleQuotedScalarString(string)
+
+
 if __name__ == '__main__':
+
+    yaml = YAML()
+    yaml.explicit_start = True
+    yaml.preserve_quotes = True
 
     config = None
 
@@ -101,7 +110,7 @@ if __name__ == '__main__':
 
     with open(in_vars_main, 'r') as stream:
         try:
-            vars_main = yaml.round_trip_load(stream, preserve_quotes=True)
+            vars_main = yaml.load(stream)
         except yaml.YAMLError as exc:
             print(exc)
 
@@ -109,7 +118,7 @@ if __name__ == '__main__':
 
     with open("menedev.docker-compose/.travis.yml", 'r') as stream:
         try:
-            config = yaml.round_trip_load(stream, preserve_quotes=True)
+            config = yaml.load(stream)
         except yaml.YAMLError as exc:
             print(exc)
 
@@ -121,7 +130,7 @@ if __name__ == '__main__':
         for version, digest in os_version.items():
             old = known_releases[os].get(version, None)
             if old is None or old != digest:
-                known_releases[os][version] = digest
+                known_releases[os][quote(version)] = quote(digest)
 
     # delete entries from known values that are not in github releases
     for os, os_version in known_releases.items():
@@ -130,34 +139,38 @@ if __name__ == '__main__':
             if other is None:
                 del known_releases[os][version]
 
+    key_latest = quote('latest')
+    key_latest_stable = quote('latest_stable')
+
     # for each os, look for the latest version
     for os, os_version in known_releases.items():
         latest = max(os_version.keys(), key=lambda v: parse(v))
-        os_version['latest'] = os_version[latest]
+        os_version[key_latest] = os_version[latest]
 
-        latest_stable = max([ v for v in os_version.keys() if not parse(v).is_prerelease], key=lambda v: parse(v))
-        os_version['latest_stable'] = os_version[latest_stable]
+        latest_stable = max([v for v in os_version.keys() if not parse(v).is_prerelease], key=lambda v: parse(v))
+        os_version[key_latest_stable] = os_version[latest_stable]
+
 
     # order the lists of releases
     #  1. latest
     #  2. latest_stable
     #  ... desc versions
     for os, os_version in known_releases.items():
-        latest = os_version['latest']
-        latest_stable = os_version['latest_stable']
-        del os_version['latest']
-        del os_version['latest_stable']
+        latest = os_version[key_latest]
+        latest_stable = os_version[key_latest_stable]
+        del os_version[key_latest]
+        del os_version[key_latest_stable]
         version_hash_list = os_version.items()
         version_hash_list = sorted(version_hash_list, key=lambda version_hash: parse(version_hash[0]), reverse=True)
         del os_version[:]
-        os_version['latest'] = latest
-        os_version['latest_stable'] = latest_stable
+        os_version[key_latest] = latest
+        os_version[key_latest_stable] = latest_stable
         for version, digest in version_hash_list:
             os_version[version] = digest
 
 
     with open(out_vars_main, 'w') as saveTo:
-        yaml.round_trip_dump(vars_main, saveTo)
+        yaml.dump(vars_main, saveTo)
 
     # Clear list but preserve comments
     del config['env'][:]
@@ -168,6 +181,6 @@ if __name__ == '__main__':
             config['env'].append("PROJECT_VERSION=" + v1 + " ANSIBLE_VERSION=" + v2)
 
     with open("exampletravis.out.yml", 'w') as saveTo:
-        yaml.round_trip_dump(config, saveTo)
+        yaml.dump(config, saveTo)
 
     print(config)
