@@ -8,3 +8,5 @@ gradle/
 out/
 
 build/
+
+menedev.docker-compose
