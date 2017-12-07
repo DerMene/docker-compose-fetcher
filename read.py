@@ -132,12 +132,29 @@ if __name__ == '__main__':
 
     # for each os, look for the latest version
     for os, os_version in known_releases.items():
-        os_version.keys()
         latest = max(os_version.keys(), key=lambda v: parse(v))
         os_version['latest'] = os_version[latest]
 
         latest_stable = max([ v for v in os_version.keys() if not parse(v).is_prerelease], key=lambda v: parse(v))
         os_version['latest_stable'] = os_version[latest_stable]
+
+    # order the lists of releases
+    #  1. latest
+    #  2. latest_stable
+    #  ... desc versions
+    for os, os_version in known_releases.items():
+        latest = os_version['latest']
+        latest_stable = os_version['latest_stable']
+        del os_version['latest']
+        del os_version['latest_stable']
+        version_hash_list = os_version.items()
+        version_hash_list = sorted(version_hash_list, key=lambda version_hash: parse(version_hash[0]), reverse=True)
+        del os_version[:]
+        os_version['latest'] = latest
+        os_version['latest_stable'] = latest_stable
+        for version, digest in version_hash_list:
+            os_version[version] = digest
+
 
     with open(out_vars_main, 'w') as saveTo:
         yaml.round_trip_dump(vars_main, saveTo)
