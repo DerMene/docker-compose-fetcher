@@ -48,7 +48,7 @@ jobs:
       - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ~/menedev.docker-compose
 
       # generate
-      - run: pip install -r requirements.txt
+      - run: pip install --user -r requirements.txt
       - run: python read.py
 
       - run: cd ~/menedev.docker-compose && git add vars/main.yml
