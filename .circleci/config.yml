@@ -45,14 +45,14 @@ jobs:
 
       - run: git config --global user.email "arndt@menedev.de" > /dev/null 2>&1
       - run: git config --global user.name "Michael Arndt" > /dev/null 2>&1
-      - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ~/menedev.docker-compose
+      - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ./menedev.docker-compose
 
       # generate
       - run: pip install --user -r requirements.txt
       - run: python read.py
 
-      - run: cd ~/menedev.docker-compose && git add vars/main.yml
-      - run: cd ~/menedev.docker-compose && git diff-index --quiet HEAD || git commit -m "updated vars/main.yml"
+      - run: cd ./menedev.docker-compose && git add vars/main.yml
+      - run: cd ./menedev.docker-compose && git diff-index --quiet HEAD || git commit -m "updated vars/main.yml"
 
       # specify other key (name corresponds to fingerprint)
-      - run: cd ~/menedev.docker-compose && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_rsa_ccbc63581fde7cd145f6c75b9af23782' git push origin master
+      - run: cd ./menedev.docker-compose && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_rsa_ccbc63581fde7cd145f6c75b9af23782' git push origin master
