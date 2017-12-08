@@ -7,7 +7,7 @@ jobs:
   build:
     docker:
       # specify the version you desire here
-      - image: circleci/openjdk:8-jdk
+      - image: circleci/python:2.7.13
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -24,19 +24,19 @@ jobs:
     steps:
       - checkout
 
-      # Download and cache dependencies
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "build.gradle" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
-
-      - run: gradle dependencies
-
-      - save_cache:
-          paths:
-            - ~/.m2
-          key: v1-dependencies-{{ checksum "build.gradle" }}
+#      # Download and cache dependencies
+#      - restore_cache:
+#          keys:
+#          - v1-dependencies-{{ checksum "requirements.txt" }}
+#          # fallback to using the latest cache if no exact match is found
+#          - v1-dependencies-
+#
+#      - run: pip install -r requirements.txt
+#
+#      - save_cache:
+#          paths:
+#            - "~/.cache/pip"
+#          key: v1-dependencies-{{ checksum "requirements.txt" }}
 
       # add key from SSH Permissions
       - add_ssh_keys:
@@ -45,13 +45,13 @@ jobs:
 
       - run: git config --global user.email "arndt@menedev.de" > /dev/null 2>&1
       - run: git config --global user.name "Michael Arndt" > /dev/null 2>&1
-      - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ~/ansible-role
+      - run: git clone git@github.com:MeneDev/ansible-role-docker-compose.git ~/menedev.docker-compose
 
       # generate
-      - run: gradle test
+      - run: python read.py
 
-      - run: cd ~/ansible-role && git add vars/main.yml
-      - run: cd ~/ansible-role && git diff-index --quiet HEAD || git commit -m "updated vars/main.yml"
+      - run: cd ~/menedev.docker-compose && git add vars/main.yml
+      - run: cd ~/menedev.docker-compose && git diff-index --quiet HEAD || git commit -m "updated vars/main.yml"
 
       # specify other key (name corresponds to fingerprint)
-      - run: cd ~/ansible-role && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_rsa_ccbc63581fde7cd145f6c75b9af23782' git push origin master
+      - run: cd ~/menedev.docker-compose && GIT_SSH_COMMAND='ssh -i ~/.ssh/id_rsa_ccbc63581fde7cd145f6c75b9af23782' git push origin master

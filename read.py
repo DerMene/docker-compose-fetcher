@@ -184,7 +184,7 @@ if __name__ == '__main__':
     del config['env'][:]
 
     max_ansible = max(ansible, key=lambda v: parse(v))
-    for v2 in [max_ansible, '2.0.0']:
+    for v2 in [max_ansible, '2.2.0']:
         for v1 in github.keys():
             config['env'].append("PROJECT_VERSION=" + v1 + " ANSIBLE_VERSION=" + v2)
 
