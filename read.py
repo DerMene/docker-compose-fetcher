@@ -19,6 +19,8 @@ in_file = role_folder + ".travis.yml"
 out_file = role_folder + "new.travis.yml"
 in_vars_main = role_folder + "vars/main.yml"
 out_vars_main = role_folder + "vars/main.yml"
+in_meta_main = role_folder + "meta/main.yml"
+out_meta_main = role_folder + "meta/main2.yml"
 
 def asset_to_os(asset, release):
     name = asset['name']
@@ -66,7 +68,7 @@ def skip_asset(asset, release):
 
     return False
 
-def get_github_versions(organization, project, known_releases):
+def get_github_versions(organization, project, known_releases, new_releases={}):
     url_pattern = "https://api.github.com/repos/{organization}/{project}/releases"
     req = requests.get(url_pattern.format(organization=organization, project=project))
     if req.status_code != requests.codes.ok:
@@ -93,6 +95,9 @@ def get_github_versions(organization, project, known_releases):
             version = asset_to_version(asset, release)
             version_entry = known_releases.get(os, {}).get(version, None)
             if not version_entry:
+                new_os_releases = new_releases.get(os, [])
+                new_os_releases.append(version)
+                new_releases[os] = new_os_releases
                 print "no checksum for %s %s, downloading" % (os, version)
                 version_checksum = asset_to_checksum(asset, release)
             else:
@@ -138,7 +143,8 @@ if __name__ == '__main__':
         except yaml.YAMLError as exc:
             print(exc)
 
-    github = get_github_versions('docker', 'compose', known_releases)
+    new_releases = {}
+    github = get_github_versions('docker', 'compose', known_releases, new_releases)
     ansible = get_pip_versions('ansible')
 
     # # add github releases one by one to preserve comments in yaml
@@ -177,13 +183,43 @@ if __name__ == '__main__':
         for version, digest in version_checksum_list:
             os_version[version] = digest
 
+    print(new_releases)
+    new_releases_commit_items = []
+    for os, releases in new_releases.items():
+        new_releases_commit_items.append(", ".join(releases) + " for " + os)
+
+    commit_msg = ""
+    if len(new_releases_commit_items) > 0:
+        commit_msg += ":arrow_up: add docker-compose version "
+        commit_msg += "; ".join(new_releases_commit_items)
+
     with open(out_vars_main, 'w') as saveTo:
         yaml.dump(vars_main, saveTo)
 
     # Clear list but preserve comments
     del config['env'][:]
 
+    meta_main = {}
+
+    with open(in_meta_main, 'r') as stream:
+        try:
+            meta_main = yaml.load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
+    galaxy_info = meta_main.get('galaxy_info', {})
+    meta_main['galaxy_info'] = galaxy_info
+    max_tested_ansible_version = galaxy_info.get('max_tested_ansible_version', '0')
+
     max_ansible = max(ansible, key=lambda v: parse(v))
+    galaxy_info['max_tested_ansible_version'] = max_ansible
+
+    print max_tested_ansible_version
+    print max_ansible
+
+    if parse(max_ansible) > parse(max_tested_ansible_version):
+        commit_msg += ":arrow_up: add test for Ansible " + max_ansible
+
     for v2 in [max_ansible, '2.2.0']:
         for v1 in github.keys():
             config['env'].append("PROJECT_VERSION=" + v1 + " ANSIBLE_VERSION=" + v2)
@@ -191,4 +227,4 @@ if __name__ == '__main__':
     with open("exampletravis.out.yml", 'w') as saveTo:
         yaml.dump(config, saveTo)
 
-    print(config)
+    print commit_msg
