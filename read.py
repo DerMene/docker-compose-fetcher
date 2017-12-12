@@ -3,7 +3,6 @@ from collections import OrderedDict
 import requests
 import json
 import hashlib
-
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import SingleQuotedScalarString, DoubleQuotedScalarString
 
@@ -11,6 +10,8 @@ try:
     from packaging.version import parse
 except ImportError:
     from pip._vendor.packaging.version import parse
+
+from git import Repo
 
 URL_PATTERN = 'https://pypi.python.org/pypi/{package}/json'
 
